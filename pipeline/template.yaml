@@ -1,0 +1,58 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Deploys a CodePipeline Pipeline with linting and security-check stages
+
+Parameters:
+  Namespace:
+    Description: The name of your team (e.g., team1, team2, team3 etc)
+    Type: String
+  
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+    - Label:
+        default: Resource Naming 
+      Parameters:
+        - Namespace
+
+Resources:
+
+#================================================================================
+# CodePipeline Artifacts S3 Bucket
+#================================================================================
+
+  CodePipelineArtifactsS3Bucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    Properties:
+      ...
+
+#================================================================================
+# CodeBuild Projects
+#================================================================================
+
+  CFNLintCodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      ...
+              
+  CFNNagCodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      ...
+
+  InfraDeployCodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      ...
+
+#================================================================================
+# CodePipeline Deployment Pipeline
+#================================================================================
+
+  DeploymentPipeline:
+    Type: AWS::CodePipeline::Pipeline
+    Properties:
+      ...
+
+Outputs:
+  ...
