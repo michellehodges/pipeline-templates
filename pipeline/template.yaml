@@ -5,6 +5,7 @@ Parameters:
   Namespace:
     Description: The name of your team (e.g., team1, team2, team3 etc)
     Type: String
+    Default: "team2"
   
 Metadata:
   AWS::CloudFormation::Interface:
@@ -24,7 +25,19 @@ Resources:
     Type: AWS::S3::Bucket
     DeletionPolicy: Retain
     Properties:
-      ...
+      BucketName: !Sub '${Namespace}-codepipeline-${AWS::Region}-${AWS::AccountId}' 
+      BucketEncryption: 
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      VersioningConfiguration: 
+        Status: Enabled 
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: True
+        BlockPublicPolicy: True
+        IgnorePublicAcls: True
+        RestrictPublicBuckets: True
+      
 
 #================================================================================
 # CodeBuild Projects
@@ -33,17 +46,48 @@ Resources:
   CFNLintCodeBuildProject:
     Type: AWS::CodeBuild::Project
     Properties:
-      ...
-              
+      Name: !Sub '${Namespace}-CFNLint' 
+      Environment: 
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/python:3.6.5
+        Type: LINUX_CONTAINER
+      ServiceRole: '{{resolve:ssm:/dojo/team2/iam/role/cfnlint-codebuild-service/arn:1}}'
+      Artifacts: 
+        Type: CODEPIPELINE
+      Source:  
+        Type: CODEPIPELINE
+        BuildSpec: |
+          version: 0.2
+          phases: 
+            install: 
+              commands: 
+                - echo Hello World! 
+
+
   CFNNagCodeBuildProject:
     Type: AWS::CodeBuild::Project
     Properties:
-      ...
+      Name: !Sub '${Namespace}-CFNNag' 
+      Environment: 
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image:  aws/codebuild/ruby:2.5.1
+        Type: LINUX_CONTAINER
+      ServiceRole: '{{resolve:ssm:/dojo/team2/iam/role/cfnnag-codebuild-service/arn:1}}'
+      Artifacts: 
+        Type: CODEPIPELINE
+      Source:  
+        Type: CODEPIPELINE
+        BuildSpec: |
+          version: 0.2
+          phases: 
+            install: 
+              commands: 
+                - echo Hello World! 
 
-  InfraDeployCodeBuildProject:
-    Type: AWS::CodeBuild::Project
-    Properties:
-      ...
+  # InfraDeployCodeBuildProject:
+  #   Type: AWS::CodeBuild::Project
+  #   Properties:
+  #     ...
 
 #================================================================================
 # CodePipeline Deployment Pipeline
@@ -52,7 +96,41 @@ Resources:
   DeploymentPipeline:
     Type: AWS::CodePipeline::Pipeline
     Properties:
-      ...
+      Name: !Sub '${Namespace}-Pipeline' 
+      ArtifactStore: 
+        Location: !Sub '${CodePipelineArtifactsS3Bucket}'
+        Type: S3
+      RoleArn: '{{resolve:ssm:/dojo/team2/iam/role/codepipeline-service/arn:1}}'
+      Stages: 
+        - Name: Source
+          Actions: 
+          - ActionTypeId:
+              Category: Source
+              Provider: S3
+              Owner: AWS
+              Version: "1"
+            Name: Source
+            OutputArtifacts:
+              - Name: Team2Artifact
+        - Name: Validate-CloudFormation-Templates
+          Actions: 
+          - ActionTypeId:
+              Category: Build
+              Provider: CodeBuild
+              Owner: AWS
+              Version: "1"
+            Name: CFN-Lint
+          - ActionTypeId:
+              Category: Build
+              Provider: CodeBuild
+              Owner: AWS
+              Version: "1"
+            Name: CFN-Nag
 
 Outputs:
-  ...
+  Team2S3Bucket:
+    Description: S3 Bucket used for CodePipeline
+    Value: !Ref "CodePipelineArtifactsS3Bucket"
+  PipelineURL:
+    Description: Pipeline URL 
+    Value: !Sub 'https://console.aws.amazon.com/codepipeline/home?region=${AWS::Region}#/view/${Namespace}-Pipeline'
